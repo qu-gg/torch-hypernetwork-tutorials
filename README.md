@@ -10,11 +10,9 @@ Includes classification and time-series examples.
   - [Common Types of Hypernetworks](#hypernetworkTypes)
   - [How to Parallelize (Conditional) Hypernetworks](#parallelizeConditionalHypernetworks)
   - [Hypernetwork Training is Tricky](#trickyHypernetworkTraining)
-
 - [PyTorch Considerations](#pytorchConsiderations)
   - [torch.Tensor vs. torch.Parameter and why it matters](#tensorVSparameter)
   - [How to properly assign weights to preserve the computation graph](#properWeightAssignment)
-
 - [References](#references)
 
 <a name="currentFiles"></a>
