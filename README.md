@@ -13,6 +13,8 @@ individual MLP <code>example_MNIST_ParallelMLP_FullHypernetwork.py</code>.
 This will be expanded with time-series (e.g. neural ODE) examples and more details on implementation considerations
 throughout the repository. Feel free to raise Issues with questions or PRs for expanding!
 
+## General Information
+
 ### Common Types of Hypernetwork
 <b>Full Hypernetworks</b>: Uses a layer to fully map from the latent output of the hypernetwork to the target weights, 
 often having large dimensionality and poor scaling issues.
@@ -37,7 +39,7 @@ how that may work across layers with differing kernel sizes.
 <p align='center'>Fig N. Schematic of the Chunked Hypernetwork. Sourced from [1].</p>
 
 ### How to Parallelize (Conditional) Hypernetworks
-Unconditional Hypernetworks (ones that either have shared ‘task embeddings’ for multi-task learning or just 
+<b>Unconditional Hypernetworks</b> (ones that either have shared ‘task embeddings’ for multi-task learning or just 
 parameterize one task) allow for the use of batching as the goal is learning networks over tasks. 
 This allows them to either just split their batch samples into their tasks and run in parallel 
 or do each batch over one task.
@@ -46,7 +48,7 @@ or do each batch over one task.
 <p align='center'>Fig N. Schematic of the Unconditioned Hypernetwork, using a global embedding vector. Modified from [1].</p>
 
 
-Conditional Hypernetworks (those using input, support sets, or control variables to influence the parameters) 
+<b>Conditional Hypernetworks</b> (those using input, support sets, or control variables to influence the parameters) 
 unfortunately do not have that ‘niceness’ in batch training. They often just get batches and apply their network 
 sequentially, aggregating statistics and performing the batch updates that way. For some problems, the computation
 cost incurred is manageable. However, for more complex problems (e.g. dynamic forecasting using ODEs), this 
