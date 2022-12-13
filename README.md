@@ -16,6 +16,7 @@
   - [How to properly assign weights to preserve the computation graph](#weightAssignmentSection)
     - [How NOT to assign weights](#wrongWeightAssignment)
     - [How to CORRECTLY assign weights](properWeightAssignment)
+  - [How to debug Hypernetworks](#hypernetworkDebugging)
 - [References](#references)
 
 <a name="currentFiles"></a>
@@ -173,6 +174,9 @@ network, deleting the old <code>.weight</code> first before assignment.
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/207449563-60e8707c-ef77-494e-a26f-98bd395e1bdb.png" alt="method2Assignment" /></p>
 <p align='center'>Fig N. Assigning the <code>.weight</code> Tensor directly by first deleting the old Tensor there.</p>
 
+<a name="hypernetworkDebugging"></a>
+### How to debug Hypernetwork issues
+Writing shortly<sup>tm</sup>.
 
 <a name="references"></a>
 ### References
