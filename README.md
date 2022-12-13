@@ -1,6 +1,7 @@
-# torch-hypernetwork-tutorials
-Hypernetwork training considerations and implementation types in PyTorch. 
-Includes classification and time-series examples.
+<h2 align='center'>torch-hypernetwork-tutorials</h2>
+<h3 align='center'>Hypernetwork training considerations and implementation types in PyTorch. 
+<br>Includes classification and time-series examples alongside 1D GroupConv Parallelization.</h3>
+
 
 <a name="toc"></a>
 ## Table of Contents
