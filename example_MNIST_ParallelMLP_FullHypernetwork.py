@@ -28,13 +28,13 @@ batch_size = 64
 test_batch_size = 64
 
 # Training epochs (usually set to 10)
-n_epochs = 20
+n_epochs = 200
 
 # Learning rate
 learning_rate = 1.0
 
 # Decay rate for adjusting the learning rate
-gamma = 0.9
+gamma = 0.99
 
 # How many batches before logging training status
 log_interval = 100

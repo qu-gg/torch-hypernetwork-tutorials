@@ -90,7 +90,7 @@ class Net(nn.Module):
         self.embedding = nn.Parameter(torch.randn([1, 5], requires_grad=True).float().cuda())
 
         # This will NOT work for gradient updating
-        # self.embedding = torch.randn([1, 10], requires_grad=True).float().cuda()
+        # self.embedding = torch.randn([1, 5], requires_grad=True).float().cuda()
 
         # Full hypernetwork, takes embedding input and outputs weights of the main network
         self.hypernet = nn.Sequential(
