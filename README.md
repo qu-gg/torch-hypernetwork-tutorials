@@ -2,7 +2,22 @@
 Hypernetwork training considerations and implementation types in PyTorch. 
 Includes classification and time-series examples.
 
+<a name="toc"></a>
+## Table of Contents
+- [Table of Contents](#toc)
+- [Current Files](#currentFiles)
+- [Information](#background)
+  - [Common Types of Hypernetworks](#hypernetworkTypes)
+  - [How to Parallelize (Conditional) Hypernetworks](#parallelizeConditionalHypernetworks)
+  - [Hypernetwork Training is Tricky](#trickyHypernetworkTraining)
 
+- [PyTorch Considerations](#pytorchConsiderations)
+  - [torch.Tensor vs. torch.Parameter and why it matters](#tensorVSparameter)
+  - [How to properly assign weights to preserve the computation graph](#properWeightAssignment)
+
+- [References](#references)
+
+<a name="currentFiles"></a>
 ### Current Files
 Currently, we have simple examples on the MNIST dataset to highlight the implementation, even if it is a trivial task.
 There is a regular full hypernetwork <code>example_MNIST_MLP_FullHypernetwork.py</code>, 
@@ -13,8 +28,10 @@ individual MLP <code>example_MNIST_ParallelMLP_FullHypernetwork.py</code>.
 This will be expanded with time-series (e.g. neural ODE) examples and more details on implementation considerations
 throughout the repository. Feel free to raise Issues with questions or PRs for expanding!
 
+<a name="generalInformation"></a>
 ## General Information
 
+<a name="hypernetworkTypes"></a>
 ### Common Types of Hypernetwork
 <b>Full Hypernetworks</b>: Uses a layer to fully map from the latent output of the hypernetwork to the target weights, 
 often having large dimensionality and poor scaling issues.
@@ -38,6 +55,7 @@ how that may work across layers with differing kernel sizes.
 <p align='center'><img width=300 src="https://user-images.githubusercontent.com/32918812/207257622-7b2bda49-bb71-498f-9ec4-a503245fe00b.png" alt="chunkedNetSchematic" /></p>
 <p align='center'>Fig N. Schematic of the Chunked Hypernetwork. Sourced from [1].</p>
 
+<a name="parallelizeConditionalHypernetworks"></a>
 ### How to Parallelize (Conditional) Hypernetworks
 <b>Unconditional Hypernetworks</b> (ones that either have shared ‘task embeddings’ for multi-task learning or just 
 parameterize one task) allow for the use of batching as the goal is learning networks over tasks. 
@@ -69,6 +87,7 @@ This may seem like additional memory usage, but for Hypernetworks that you batch
 it ends up being equivalent storage. In my experience when applying this to ODE dynamics affected by Hypernetworks, 
 it sped training up from 1.5hr/epoch to 12min/epoch for my largest dataset!
 
+<a name="trickyHypernetworkTraining"></a>
 ### Hypernetwork Training is Tricky
 Hypernetworks, despite their usefulness, can be incredibly finicky to train well. Firstly, they can take a long time
 to start converging on complicated datasets and, in cases, fail to converge at a strong solution [4, 6]. The usage of Batch 
@@ -82,11 +101,13 @@ Due to this, several different works have tried to find solutions, both practica
 when the main-network becomes itself a wide MLP. In practice, I have found that these initialization tricks still aren't
 the end-all-be-all for training, but they can help in certain tasks.
 
+<a name="pytorchConsiderations"></a>
 ## PyTorch Considerations
 Here we detail PyTorch-specific implementation tricks and considerations when dealing with Hypernetworks, especially
 tricky ones that new practitioners may find hard to come by. I hope this, combined with the implementations, have some
 practical use and quickens the pace at which one may leverage this method!
 
+<a name="tensorVSparameter"></a>
 ### torch.Tensor vs. torch.Parameter and why it matters
 There is a subtle distinction between the Tensor and Parameter objects in PyTorch and the usage of Tensor in the wrong
 place can cause frustration in hypernetworks with optimized embedding vectors (e.g. multi-task vectors, chunked Hypernetworks, etc). 
@@ -111,9 +132,11 @@ vectors.
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/207268293-9c1ab609-94d7-4431-8dbd-1611b37c7b1d.png" alt="parameterGradient" /></p>
 <p align='center'>Fig N. Using a Parameter as the optimized embedding vector works, as it is assigned to the Module's <code>.parameters()</code>.</p>
 
+<a name="properWeightAssignment"></a>
 ### How to properly assign weights to preserve the computation graph
 Writing up shortly<sup>tm</sup>.
 
+<a name="references"></a>
 ### References
 [1] Johannes von Oswald, Christian Henning, Benjamin F. Grewe, and João Sacramento. Continual learning with Hypernetworks, 2019.
 
