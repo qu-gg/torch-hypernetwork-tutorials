@@ -9,11 +9,13 @@
 - [Current Files](#currentFiles)
 - [Information](#background)
   - [Common Types of Hypernetworks](#hypernetworkTypes)
-  - [How to Parallelize (Conditional) Hypernetworks](#parallelizeConditionalHypernetworks)
   - [Hypernetwork Training is Tricky](#trickyHypernetworkTraining)
+  - [How to Parallelize (Conditional) Hypernetworks](#parallelizeConditionalHypernetworks)
 - [PyTorch Considerations](#pytorchConsiderations)
   - [torch.Tensor vs. torch.Parameter and why it matters](#tensorVSparameter)
-  - [How to properly assign weights to preserve the computation graph](#properWeightAssignment)
+  - [How to properly assign weights to preserve the computation graph](#weightAssignmentSection)
+    - [How NOT to assign weights](#wrongWeightAssignment)
+    - [How to CORRECTLY assign weights](properWeightAssignment)
 - [References](#references)
 
 <a name="currentFiles"></a>
@@ -54,6 +56,20 @@ how that may work across layers with differing kernel sizes.
 <p align='center'><img width=300 src="https://user-images.githubusercontent.com/32918812/207257622-7b2bda49-bb71-498f-9ec4-a503245fe00b.png" alt="chunkedNetSchematic" /></p>
 <p align='center'>Fig N. Schematic of the Chunked Hypernetwork. Sourced from [1].</p>
 
+<a name="trickyHypernetworkTraining"></a>
+### Hypernetwork Training is Tricky
+Hypernetworks, despite their usefulness, can be incredibly finicky to train well. Firstly, they can take a long time
+to start converging on complicated datasets and, in cases, fail to converge at a strong solution [4, 6]. The usage of Batch 
+Normalization within the hypernetwork has empirically been shown to stabilize this a bit [5], however this isn't a
+universal solution. Indeed, there is no theoretical guarantee that infinitely-wide hypernetworks converge to a global 
+minima under gradient descent [6]. 
+
+Due to this, several different works have tried to find solutions, both practical and theoretical, to this problem.
+[4] and [5] highlight practical Hypernetwork initialization schemas that help stabilize training and kickstart convergence.
+[6] as well propose an initialization schema, however also detail how convexity and convergence guarantees can emerge 
+when the main-network becomes itself a wide MLP. In practice, I have found that these initialization tricks still aren't
+the end-all-be-all for training, but they can help in certain tasks.
+
 <a name="parallelizeConditionalHypernetworks"></a>
 ### How to Parallelize (Conditional) Hypernetworks
 <b>Unconditional Hypernetworks</b> (ones that either have shared ‘task embeddings’ for multi-task learning or just 
@@ -86,20 +102,6 @@ This may seem like additional memory usage, but for Hypernetworks that you batch
 it ends up being equivalent storage. In my experience when applying this to ODE dynamics affected by Hypernetworks, 
 it sped training up from 1.5hr/epoch to 12min/epoch for my largest dataset!
 
-<a name="trickyHypernetworkTraining"></a>
-### Hypernetwork Training is Tricky
-Hypernetworks, despite their usefulness, can be incredibly finicky to train well. Firstly, they can take a long time
-to start converging on complicated datasets and, in cases, fail to converge at a strong solution [4, 6]. The usage of Batch 
-Normalization within the hypernetwork has empirically been shown to stabilize this a bit [5], however this isn't a
-universal solution. Indeed, there is no theoretical guarantee that infinitely-wide hypernetworks converge to a global 
-minima under gradient descent [6]. 
-
-Due to this, several different works have tried to find solutions, both practical and theoretical, to this problem.
-[4] and [5] highlight practical Hypernetwork initialization schemas that help stabilize training and kickstart convergence.
-[6] as well propose an initialization schema, however also detail how convexity and convergence guarantees can emerge 
-when the main-network becomes itself a wide MLP. In practice, I have found that these initialization tricks still aren't
-the end-all-be-all for training, but they can help in certain tasks.
-
 <a name="pytorchConsiderations"></a>
 ## PyTorch Considerations
 Here we detail PyTorch-specific implementation tricks and considerations when dealing with Hypernetworks, especially
@@ -109,8 +111,9 @@ practical use and quickens the pace at which one may leverage this method!
 <a name="tensorVSparameter"></a>
 ### torch.Tensor vs. torch.Parameter and why it matters
 There is a subtle distinction between the Tensor and Parameter objects in PyTorch and the usage of Tensor in the wrong
-place can cause frustration in hypernetworks with optimized embedding vectors (e.g. multi-task vectors, chunked Hypernetworks, etc). 
-Specific information on the docs can be found <a href="https://pytorch.org/docs/stable/generated/torch.nn.parameter.Parameter.html">here</a>. 
+place can cause frustration when implementing Hypernetworks with optimized embedding vectors (e.g. multi-task vectors, 
+chunked Hypernetworks, etc). Specific information on the docs can be found 
+<a href="https://pytorch.org/docs/stable/generated/torch.nn.parameter.Parameter.html">here</a>. 
 
 The general idea is that Tensors may only hold temporary states (such as the hidden state of an RNN) and thus by design
 Tensors are not registered as objects to be tracked within the backward pass of the computation graph. Specifically, it 
@@ -131,9 +134,45 @@ vectors.
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/207268293-9c1ab609-94d7-4431-8dbd-1611b37c7b1d.png" alt="parameterGradient" /></p>
 <p align='center'>Fig N. Using a Parameter as the optimized embedding vector works, as it is assigned to the Module's <code>.parameters()</code>.</p>
 
-<a name="properWeightAssignment"></a>
+<a name="weightAssignmentSection"></a>
 ### How to properly assign weights to preserve the computation graph
-Writing up shortly<sup>tm</sup>.
+Many things can break the computation graph and gradient flow between the main network and the Hypernetwork. For example,
+something as innocent as the assignment of the Hypernet's output tensor to the main-net's weights can cause a break if
+it is not done right. First we'll start with common mistakes used that cause a graph break despite it looking 'fine'.
+
+<a name="wrongWeightAssignment"></a>
+<b>How NOT to assign weights</b>:
+
+Example 1: Setting the main-net weight Tensors to a Parameter made out of the output tensor creates a break as a .clone()
+is applied to the weight Tensor <b>w</b>.
+<p align='center'><img width=500 src="https://user-images.githubusercontent.com/32918812/207446316-423fb088-00c3-4685-a910-c8d742cf8a3f.png" alt="wrongWeightAssignment" /></p>
+
+Example 2: Setting the Tensor directly to the .data attribute of the Parameter does not work as it breaks the <code>grad_fn</code>
+backward connection.
+<p align='center'><img width=400 src="https://user-images.githubusercontent.com/32918812/207446888-24aedeb7-e306-4209-89ed-f7657a462311.png" alt="wrongWeightAssignment2" /></p>
+
+<a name="properWeightAssignment"></a>
+<b>How to CORRECTLY assign weights</b>:
+
+Method 1 - Using the <code>torch.nn.functional</code> layers: These functional layers act as layers not pre-defined in
+the nn.Module and allows you to pass in Tensors directly to use as their weights/biases. It seems that no 
+<code>.clone()</code> is applied for this layer and thus the graph + grads are preserved. To use this method, it is as
+simple as generating the weights from the Hypernetwork and passing in the output Tensors into the <code>F.linear()</code>
+function alongside the input.
+
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/207449907-ad9be26c-4a83-468b-b989-350ef51b6b0c.png" alt="method1Assignment" /></p>
+<p align='center'>Fig N. Using <code>torch.nn.functional</code> layers with the direct Tensor output.</p>
+
+Method 2 - Directly accessing the defined <code>.weight</code> Tensor but not assigning to it directly: The problem 
+with Examples 1 and 2 above is that they tried to modify the weights object itself, which induced <code>.clone()</code>
+calls and broke the computation graph. If, instead, we fully delete the <code>.weight</code> object before assignment,
+we can preserve the computation graph by straight setting the <code>.weight</code> attribute of the Parameter to that
+output Tensor. For this method, we get the full weight output and split it by layer while assigning the splice to the main
+network, deleting the old <code>.weight</code> first before assignment.
+
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/207449563-60e8707c-ef77-494e-a26f-98bd395e1bdb.png" alt="method2Assignment" /></p>
+<p align='center'>Fig N. Assigning the <code>.weight</code> Tensor directly by first deleting the old Tensor there.</p>
+
 
 <a name="references"></a>
 ### References
@@ -149,3 +188,5 @@ Writing up shortly<sup>tm</sup>.
 Conference on Learning Representations. 2019.
 
 [6] Littwin, Etai, et al. "On infinite-width hypernetworks." Advances in Neural Information Processing Systems 33 (2020): 13226-13237.
+
+[7] https://discuss.pytorch.org/t/assign-parameters-to-nn-module-and-have-grad-fn-track-it/62677
