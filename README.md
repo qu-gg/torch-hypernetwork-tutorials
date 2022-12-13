@@ -16,7 +16,7 @@ Includes classification and time-series examples.
 - [References](#references)
 
 <a name="currentFiles"></a>
-### Current Files
+## Current Files
 Currently, we have simple examples on the MNIST dataset to highlight the implementation, even if it is a trivial task.
 There is a regular full hypernetwork <code>example_MNIST_MLP_FullHypernetwork.py</code>, 
 a chunked version <code>example_MNIST_MLP_ChunkedHypernetwork.py</code>, 
