@@ -17,6 +17,11 @@
     - [How NOT to assign weights](#wrongWeightAssignment)
     - [How to CORRECTLY assign weights](properWeightAssignment)
   - [How to debug Hypernetworks](#hypernetworkDebugging)
+    - [Prerequisites](#prerequisites)
+    - [Specifics](#specifics)
+      - [Before the backwards call](#beforeBackwardsCall)
+      - [Before the optimizer step](#beforeOptimizerStep)
+      - [Right after the optimizer step](#afterOptimizerStep)
 - [References](#references)
 
 <a name="currentFiles"></a>
@@ -144,18 +149,18 @@ it is not done right. First we'll start with common mistakes used that cause a g
 <a name="wrongWeightAssignment"></a>
 <b>How NOT to assign weights</b>:
 
-Example 1: Setting the main-net weight Tensors to a Parameter made out of the output tensor creates a break as a .clone()
+<i>Example 1</i>: Setting the main-net weight Tensors to a Parameter made out of the output tensor creates a break as a .clone()
 is applied to the weight Tensor <b>w</b>.
 <p align='center'><img width=500 src="https://user-images.githubusercontent.com/32918812/207446316-423fb088-00c3-4685-a910-c8d742cf8a3f.png" alt="wrongWeightAssignment" /></p>
 
-Example 2: Setting the Tensor directly to the .data attribute of the Parameter does not work as it breaks the <code>grad_fn</code>
+<i>Example 2</i>: Setting the Tensor directly to the .data attribute of the Parameter does not work as it breaks the <code>grad_fn</code>
 backward connection.
 <p align='center'><img width=400 src="https://user-images.githubusercontent.com/32918812/207446888-24aedeb7-e306-4209-89ed-f7657a462311.png" alt="wrongWeightAssignment2" /></p>
 
 <a name="properWeightAssignment"></a>
 <b>How to CORRECTLY assign weights</b>:
 
-Method 1 - Using the <code>torch.nn.functional</code> layers: These functional layers act as layers not pre-defined in
+<i>Method 1</i> - Using the <code>torch.nn.functional</code> layers: These functional layers act as layers not pre-defined in
 the nn.Module and allows you to pass in Tensors directly to use as their weights/biases. It seems that no 
 <code>.clone()</code> is applied for this layer and thus the graph + grads are preserved. To use this method, it is as
 simple as generating the weights from the Hypernetwork and passing in the output Tensors into the <code>F.linear()</code>
@@ -164,7 +169,7 @@ function alongside the input.
 <p align='center'><img src="https://user-images.githubusercontent.com/32918812/207449907-ad9be26c-4a83-468b-b989-350ef51b6b0c.png" alt="method1Assignment" /></p>
 <p align='center'>Fig N. Using <code>torch.nn.functional</code> layers with the direct Tensor output.</p>
 
-Method 2 - Directly accessing the defined <code>.weight</code> Tensor but not assigning to it directly: The problem 
+<i>Method 2</i> - Directly accessing the defined <code>.weight</code> Tensor but not assigning to it directly: The problem 
 with Examples 1 and 2 above is that they tried to modify the weights object itself, which induced <code>.clone()</code>
 calls and broke the computation graph. If, instead, we fully delete the <code>.weight</code> object before assignment,
 we can preserve the computation graph by straight setting the <code>.weight</code> attribute of the Parameter to that
@@ -176,7 +181,70 @@ network, deleting the old <code>.weight</code> first before assignment.
 
 <a name="hypernetworkDebugging"></a>
 ### How to debug Hypernetwork issues
-Writing shortly<sup>tm</sup>.
+Debugging Hypernetworks is a fair bit of effort, however it is the best method in ensuring that the computation graph
+is well-structured and your outputs are being properly assigned. This is best to do whenever there is an architectural
+change, as we've shown that even 'simple' changes can break things. It is also advised to do this prior to any sort of
+legitimate experiments that you wish to glean results from, as a broken computation graph results in defunct training 
+and wasted time.
+
+<a name="prerequisites"></a>
+<b>Prerequisites</b>: In PyTorch, each layer (e.g. <code>Linear</code> or <code>1DConv</code>) has a weight and bias 
+<code>Parameter</code> object that holds the Tensors for that layer, as well as any supporting attributes or state that 
+aids in the computation graph updates. This includes the <code>grad</code> and <code>grad_fn</code> attributes, 
+which respectively hold the gradients calculated from backprop and the function link to the computation graph next. 
+The actual values are stored in the <code>.data</code> attributes of the Parameters.
+
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/207706388-8854aa7d-a85b-465d-9d00-23447a1fcd51.png" alt="parameterAttributes" /></p>
+<p align='center'>Fig N. Attributes of the weight <code>Parameter</code> for a <code>nn.Linear</code> layer.</p>
+
+Broken computation graphs primarily break the <code>grad_fn</code> link and cause any higher-level Tensors to no longer 
+receive the gradient flow during the <code>.backward</code> call. Thus, the relevant Tensors to view at various stages
+of the update step <code>.data</code>, <code>.grad</code>, and <code>.grad_fn</code>.
+
+<a name="specifics"></a>
+<b>Specifics</b>: This method of debugging is best done in an IDE with easy access to breakpoints and viewing object state 
+at different steps, such as PyCharm or VS Code. You can do this entirely with print statements; it is just messier. The
+essential idea is to set a breakpoint at 3 stages - 1) right before the <code>loss.backward()</code> call, 2) right after
+it but before the <code>optimizer.step()</code> call, and 3) right after the optimizer step.
+
+<p align='center'><img width=400 src="https://user-images.githubusercontent.com/32918812/207711193-2e71fbec-5cf4-4210-8f26-2e74b3d55014.png" alt="breakpoints" /></p>
+<p align='center'>Fig N. Where to assign debugging breakpoints for Hypernetworks.</p>
+
+The reasons for this are as follows:
+
+<a name="beforeBackwardsCall"></a>
+<i>1) Before the <b>backwards</b> call</i>: This allows you to view whether the Tensor output of the Hypernetwork matches the
+<code>.weight</code> Tensor of the main network. With this, you can confirm that at least the assignment to the main network
+is working.
+
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/207716367-d9f4ed65-a7d5-4811-ab05-0d98cf98679c.png" alt="debugWeights" /></p>
+<p align='center'>Fig N. Viewing the Hypernetwork output and the main network weights.</p>
+
+<a name="beforeOptimizerStep"></a>
+<i>2) Before the <b>optimizer</b> step</i>: The <code>.backward()</code> call induces the gradient calculations of the generated
+computation graph, meaning that you can view the <code>grad</code> and <code>grad_fn</code> of all Tensors. This is to 
+ensure that the Hypernetwork Tensors have a gradient that will be used in their update. A gradient Tensor should be seen
+here; otherwise, a graph breakage is occurring somewhere in the network.
+
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/207720794-919edc43-6749-4875-bf93-c9a09723a1b7.png" alt="debugGradTensors" /></p>
+<p align='center'>Fig N. Confirming the Hypernetwork Layers receive gradients after the <code>loss.backward()</code>call.</p>
+
+In addition, you can manually check the <code>grad_fn</code> connections by walking up from the main network weight
+Tensor back to the Hypernetwork output. In the figure below, you can confirm the connection if the memory address
+of the Hypernetwork output is found in the <code>next_function</code> stack of the main network weight Tensor.
+
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/207718980-830ef3ca-ade7-46dc-b3ee-6fdd1234c9da.png" alt="debugGradFN" /></p>
+<p align='center'>Fig N. Checking the grad_fn stack of the main network weight Tensor to confirm the Hypernetwork connection.</p>
+
+<a name="afterOptimizerStep"></a>
+<i>3) Right after the <b>optimizer</b> step</i>: At this step you can ensure that the weight Parameters were 
+indeed updated by the gradient and that the learning process is correct for the Hypernetwork layers.
+
+<p align='center'><img src="https://user-images.githubusercontent.com/32918812/207722469-96df1849-6c5f-4e06-a0d9-222f2b128f28.png" alt="debugParameterUpdate" /></p>
+<p align='center'>Fig N. Ensuring that the gradient update is being applied to the Hypernetwork weight Tensors after the <code>optimizer.step()</code>.</p>
+
+### Conclusion + Recap
+Writing shortly<sup>tm</sup>
 
 <a name="references"></a>
 ### References
