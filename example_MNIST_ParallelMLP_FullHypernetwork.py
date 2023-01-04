@@ -118,9 +118,9 @@ class Net(nn.Module):
         # the filters between layers. As we use a 1x1 kernel, 1 stride, and groups=batch_size with
         # filters=num_nodes*batch_size, we have each group relate to one individual MLP
         self.main_net = nn.Sequential(
-            nn.Conv1d(x_dim * batch_size, z_dim * batch_size, 1, groups=batch_size, bias=True),
+            nn.Conv1d(x_dim * batch_size, z_dim * batch_size, 1, groups=batch_size, bias=False),
             GroupSwish(batch_size),
-            nn.Conv1d(z_dim * batch_size, num_classes * batch_size, 1, groups=batch_size, bias=True),
+            nn.Conv1d(z_dim * batch_size, num_classes * batch_size, 1, groups=batch_size, bias=False),
         )
 
     def sample_weights(self, x):

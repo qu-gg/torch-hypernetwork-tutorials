@@ -109,7 +109,7 @@ class Net(nn.Module):
 
     def sample_weights(self):
         # Get the main net weight outputs from the hypernetwork
-        weights = self.hypernet(self.embedding)[0]
+        self.hypernet_outputs = self.hypernet(self.embedding)[0]
 
         # Split the output vector per layer
         next_idx = 0
@@ -119,7 +119,7 @@ class Net(nn.Module):
             next_idx += self.layers_dim[i] * self.layers_dim[i + 1]
 
             # Get the weight splice for these layers and shape to weight tensor
-            weights_splice = weights[cur_idx:next_idx].reshape([self.layers_dim[i + 1], self.layers_dim[i]])
+            weights_splice = self.hypernet_outputs[cur_idx:next_idx].reshape([self.layers_dim[i + 1], self.layers_dim[i]])
 
             # Copy over the generated weights into the parameters of the dynamics network
             # Note that this delete is important to properly establish the computation graph link
